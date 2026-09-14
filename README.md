@@ -179,6 +179,15 @@ detection into one live view — and one Markdown briefing you can hand to an AI
   together (`detector [cb 210 ms ⟵ slowest cb] → /objects (4.1 Hz ⟵ slowest)`).
 - **Profiles**: `autoware`, `nav2`, `moveit` (grouping + expected rates, incl.
   regex patterns like `^/control/command/.*` that set a floor for a whole stage).
+  A custom profile can also declare node patterns for a scoped graph view:
+  ```yaml
+  scope:
+    node_allowlist:
+      - '^/example/.*'
+      - '^/standalone_node$'
+  ```
+  Patterns match fully-qualified node ids. If the section is absent, empty, or
+  contains no valid regex, the scope is inactive and the graph is unfiltered.
 - **Live tuning**: a Settings tab (and `POST /api/v1/config`) to adjust expected
   rates and thresholds at runtime — no restart, the issue engine picks it up.
 - **Terminal top view**: `rgd top` gives an SSH-friendly dashboard with
