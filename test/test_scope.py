@@ -27,6 +27,10 @@ def test_profile_parses_node_allowlist(tmp_path):
     'name: missing\n',
     'name: empty\nscope: {}\n',
     "name: invalid\nscope:\n  node_allowlist: ['[']\n",
+    'name: list\nscope: []\n',
+    'name: scalar\nscope: not-a-mapping\n',
+    'name: null-allowlist\nscope:\n  node_allowlist:\n',
+    "name: scalar-allowlist\nscope:\n  node_allowlist: '^/node$'\n",
 ])
 def test_missing_empty_or_invalid_scope_is_inactive(tmp_path, contents):
     profile = tmp_path / 'profile.yaml'
@@ -40,10 +44,20 @@ def test_missing_empty_or_invalid_scope_is_inactive(tmp_path, contents):
 
 
 def test_scope_matches_fully_qualified_node_ids_and_skips_invalid_patterns():
-    scope = ScopeConfig(node_allowlist=['[', '^/camera/.*', '^/planner$'])
+    scope = ScopeConfig(node_allowlist=[
+        '[', b'^/camera', '^/camera/.*', '^/planner$'])
 
     assert scope.active
     assert scope.matches_node('/camera/front')
     assert scope.matches_node('/planner')
     assert not scope.matches_node('/camera_driver')
     assert not scope.matches_node('/planner/helper')
+
+
+def test_set_node_allowlist_rebuilds_compiled_patterns():
+    scope = ScopeConfig(node_allowlist=['^/before$'])
+
+    scope.set_node_allowlist(['^/after$'])
+
+    assert not scope.matches_node('/before')
+    assert scope.matches_node('/after')

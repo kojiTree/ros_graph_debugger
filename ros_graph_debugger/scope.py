@@ -8,8 +8,8 @@ consumers can share it without importing :mod:`rclpy`.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Pattern
 
 
 @dataclass
@@ -23,8 +23,8 @@ class ScopeConfig:
     """
 
     node_allowlist: list[str] = field(default_factory=list)
-    _node_allowlist_re: list[Pattern[str]] = field(
-        default_factory=list, init=False, repr=False)
+    _node_allowlist_re: list[re.Pattern[str]] = field(
+        default_factory=list, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         self._recompile()
@@ -32,11 +32,18 @@ class ScopeConfig:
     def _recompile(self) -> None:
         compiled = []
         for pattern in self.node_allowlist:
+            if not isinstance(pattern, str):
+                continue
             try:
                 compiled.append(re.compile(pattern))
             except (re.error, TypeError):
                 continue
         self._node_allowlist_re = compiled
+
+    def set_node_allowlist(self, patterns: Iterable[str]) -> None:
+        """Replace the node allowlist and rebuild its compiled cache."""
+        self.node_allowlist = list(patterns)
+        self._recompile()
 
     @property
     def active(self) -> bool:

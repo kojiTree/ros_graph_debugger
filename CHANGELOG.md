@@ -7,7 +7,8 @@ roadmap-driven 0.x line where each minor version is a coherent feature set
 ## [Unreleased]
 
 ### Added
-- Nothing yet.
+- Profile `scope.node_allowlist` configuration with tolerant regex parsing and
+  inactive, include-all behavior when no valid patterns are configured.
 
 ## [0.4.0] — show it — 2026-06-11
 
