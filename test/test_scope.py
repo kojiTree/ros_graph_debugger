@@ -2,6 +2,7 @@
 
 import pytest
 
+from ros_graph_debugger.paths import find_profile
 from ros_graph_debugger.profile import load_profile
 from ros_graph_debugger.scope import ScopeConfig, filter_snapshot
 
@@ -21,6 +22,51 @@ def test_profile_parses_node_allowlist(tmp_path):
     assert isinstance(data['_scope'], ScopeConfig)
     assert data['_scope'].node_allowlist == ['^/camera/.*', '^/planner$']
     assert data['_scope'].active
+
+
+def test_bundled_scope_example_narrows_representative_snapshot():
+    path = find_profile('scope-example')
+    assert path, 'scope-example profile should be discoverable by name'
+    data, name = load_profile(path)
+    snapshot = {
+        'nodes': [
+            {'id': '/example/camera', 'publishers': ['/image'],
+             'subscribers': []},
+            {'id': '/standalone_node', 'publishers': [],
+             'subscribers': ['/image']},
+            {'id': '/monitor/logger', 'publishers': [],
+             'subscribers': ['/image']},
+        ],
+        'topics': [
+            {'name': '/image', 'publishers': ['/example/camera'],
+             'subscribers': ['/standalone_node', '/monitor/logger'],
+             'publisher_count': 1, 'subscriber_count': 2},
+        ],
+        'edges': [
+            {'from_node': '/example/camera',
+             'to_node': '/standalone_node', 'topic': '/image'},
+            {'from_node': '/example/camera',
+             'to_node': '/monitor/logger', 'topic': '/image'},
+        ],
+    }
+
+    narrowed = filter_snapshot(snapshot, data['_scope'])
+
+    assert name == 'scope-example'
+    assert [node['id'] for node in narrowed['nodes']] == [
+        '/example/camera', '/standalone_node']
+    assert narrowed['topics'] == [{
+        'name': '/image',
+        'publishers': ['/example/camera'],
+        'subscribers': ['/standalone_node'],
+        'publisher_count': 1,
+        'subscriber_count': 1,
+    }]
+    assert narrowed['edges'] == [{
+        'from_node': '/example/camera',
+        'to_node': '/standalone_node',
+        'topic': '/image',
+    }]
 
 
 @pytest.mark.parametrize('contents', [

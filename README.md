@@ -186,6 +186,9 @@ detection into one live view — and one Markdown briefing you can hand to an AI
       - '^/example/.*'
       - '^/standalone_node$'
   ```
+  The bundled [`scope-example` profile](profiles/scope-example.yaml) uses this
+  configuration; run it with
+  `ros2 run ros_graph_debugger agent --profile scope-example`.
   Patterns match fully-qualified node ids and narrow the existing REST API,
   WebSocket stream, and web UI. Override the profile ad hoc with repeatable
   `--scope-node REGEX` options. If no usable pattern is configured, the scope

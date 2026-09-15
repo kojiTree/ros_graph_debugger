@@ -1,0 +1,7 @@
+name: scope-example
+description: Example node-scoped graph view for a generic ROS system.
+
+scope:
+  node_allowlist:
+    - '^/example/.*'
+    - '^/standalone_node$'
