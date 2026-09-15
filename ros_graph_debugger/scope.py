@@ -1,8 +1,13 @@
-"""
-Configuration for selecting the nodes shown in a graph view.
+"""Configuration and snapshot filtering for node-scoped graph views.
 
 This module deliberately has no ROS dependencies so profile loading and graph
-consumers can share it without importing :mod:`rclpy`.
+consumers can share it without importing :mod:`rclpy`.  Nodes are the sole
+allowlist: topics are derived from their retained publisher/subscriber
+endpoints, and graph edges must connect two retained nodes.  Callbacks and
+issues are filtered through their node/topic references.  TF edges and
+diagnostics stay global because their identifiers are frames and arbitrary
+status names rather than node ids, so applying node regexes to them would be
+misleading.
 """
 
 from __future__ import annotations
@@ -55,3 +60,84 @@ class ScopeConfig:
         if not self.active:
             return True
         return any(pattern.search(node_id) for pattern in self._node_allowlist_re)
+
+
+def filter_snapshot(snapshot: dict, scope: ScopeConfig) -> dict:
+    """Return a copy of ``snapshot`` narrowed to ``scope``'s node allowlist.
+
+    An inactive scope returns the original snapshot unchanged.  The active
+    path does not mutate either argument and preserves unrecognised top-level
+    snapshot fields for forward compatibility.
+    """
+    if not scope.active:
+        return snapshot
+
+    node_ids = {
+        node.get('id') for node in snapshot.get('nodes', [])
+        if scope.matches_node(node.get('id', ''))
+    }
+
+    topics = []
+    for topic in snapshot.get('topics', []):
+        publishers = [node for node in topic.get('publishers', [])
+                      if node in node_ids]
+        subscribers = [node for node in topic.get('subscribers', [])
+                       if node in node_ids]
+        if not publishers and not subscribers:
+            continue
+        narrowed = dict(topic)
+        narrowed['publishers'] = publishers
+        narrowed['subscribers'] = subscribers
+        narrowed['publisher_count'] = len(publishers)
+        narrowed['subscriber_count'] = len(subscribers)
+        if 'qos_endpoints' in narrowed:
+            narrowed['qos_endpoints'] = [
+                endpoint for endpoint in narrowed.get('qos_endpoints', [])
+                if endpoint.get('node') in node_ids
+            ]
+        topics.append(narrowed)
+
+    topic_names = {topic.get('name') for topic in topics}
+    nodes = []
+    for node in snapshot.get('nodes', []):
+        if node.get('id') not in node_ids:
+            continue
+        narrowed = dict(node)
+        narrowed['publishers'] = [topic for topic in node.get('publishers', [])
+                                  if topic in topic_names]
+        narrowed['subscribers'] = [topic for topic in node.get('subscribers', [])
+                                   if topic in topic_names]
+        nodes.append(narrowed)
+
+    edges = [
+        edge for edge in snapshot.get('edges', [])
+        if edge.get('from_node') in node_ids
+        and edge.get('to_node') in node_ids
+        and edge.get('topic') in topic_names
+    ]
+    callbacks = [
+        callback for callback in snapshot.get('callbacks', [])
+        if callback.get('node') in node_ids
+        and (not callback.get('topic')
+             or callback.get('topic') in topic_names)
+    ]
+
+    issues = []
+    for issue in snapshot.get('issues', []):
+        related_nodes = issue.get('related_nodes', [])
+        related_topics = issue.get('related_topics', [])
+        if ((related_nodes or related_topics)
+                and not (node_ids.intersection(related_nodes)
+                         or topic_names.intersection(related_topics))):
+            continue
+        narrowed = dict(issue)
+        narrowed['related_nodes'] = [node for node in related_nodes
+                                     if node in node_ids]
+        narrowed['related_topics'] = [topic for topic in related_topics
+                                      if topic in topic_names]
+        issues.append(narrowed)
+
+    result = dict(snapshot)
+    result.update(nodes=nodes, topics=topics, edges=edges,
+                  callbacks=callbacks, issues=issues)
+    return result
