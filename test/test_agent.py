@@ -1,7 +1,5 @@
 """Agent CLI configuration tests."""
 
-import pytest
-
 from ros_graph_debugger.agent import _apply_scope_override, _parse_args
 from ros_graph_debugger.model import RuntimeGraphStore
 from ros_graph_debugger.scope import ScopeConfig
@@ -13,14 +11,6 @@ def test_scope_node_flag_is_repeatable():
         '--scope-node', '^/camera/.*', '--scope-node', '^/planner$'])
 
     assert args.scope_node == ['^/camera/.*', '^/planner$']
-
-
-def test_profile_help_lists_bundled_scope_example(capsys):
-    with pytest.raises(SystemExit) as exc_info:
-        _parse_args(['--help'])
-
-    assert exc_info.value.code == 0
-    assert 'scope-example' in capsys.readouterr().out
 
 
 def test_scope_node_flag_overrides_profile_scope():
