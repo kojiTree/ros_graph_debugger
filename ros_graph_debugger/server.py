@@ -32,7 +32,9 @@ def create_app(store, web_dir: str,
                thresholds=None) -> FastAPI:
     app = FastAPI(title='ros_graph_debugger', version=__version__)
 
-    scope = (profile_data or {}).get('_scope', ScopeConfig())
+    configured_scope = (profile_data or {}).get('_scope')
+    scope = configured_scope \
+        if isinstance(configured_scope, ScopeConfig) else ScopeConfig()
 
     def read_snapshot() -> dict:
         """Read the store once and apply the configured serving view."""
@@ -59,7 +61,7 @@ def create_app(store, web_dir: str,
         }
         if scope.active:
             profile_public['scope'] = {
-                'node_allowlist': list(scope.node_allowlist),
+                'node_allowlist': scope.effective_node_allowlist,
             }
 
     # ------------------------------------------------------------- REST API #

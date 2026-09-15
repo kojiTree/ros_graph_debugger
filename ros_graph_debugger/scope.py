@@ -57,6 +57,11 @@ class ScopeConfig:
         """Whether this scope has at least one usable allowlist pattern."""
         return bool(self._node_allowlist_re)
 
+    @property
+    def effective_node_allowlist(self) -> list[str]:
+        """Patterns that compiled successfully and are applied to the view."""
+        return [pattern.pattern for pattern in self._node_allowlist_re]
+
     def matches_node(self, node_id: str) -> bool:
         """Return whether a fully-qualified node id belongs in this scope."""
         if not self.active:

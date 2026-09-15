@@ -81,7 +81,7 @@ def scoped_base_url():
         profile_data={
             'name': 'scoped',
             'groups': {},
-            '_scope': ScopeConfig(node_allowlist=['^/planner$']),
+            '_scope': ScopeConfig(node_allowlist=['^/bad[', '^/planner$']),
         })
     port = 38940
     config = uvicorn.Config(app, host='127.0.0.1', port=port, log_level='error')
@@ -149,6 +149,16 @@ def test_scoped_app_uses_same_view_across_rest_and_markdown(scoped_base_url):
         markdown = response.read().decode()
     assert '/traj' in markdown
     assert '/objects' not in markdown
+
+
+def test_app_ignores_unexpected_private_scope_type():
+    app = create_app(
+        _store(), web_dir='/nonexistent',
+        profile_data={'name': 'recording', 'groups': {}, '_scope': {}})
+    profile_route = next(
+        route for route in app.routes if route.path == '/api/v1/profile')
+
+    assert profile_route.endpoint() == {'name': 'recording', 'groups': {}}
 
 
 def test_scoped_app_stream_uses_same_view(scoped_base_url):

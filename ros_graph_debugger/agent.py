@@ -60,7 +60,13 @@ def _apply_scope_override(profile_data, node_allowlist):
         return profile_data
     if profile_data is None:
         profile_data = {}
-    profile_data['_scope'] = ScopeConfig(node_allowlist=list(node_allowlist))
+    patterns = list(node_allowlist)
+    scope = ScopeConfig(node_allowlist=patterns)
+    effective_patterns = set(scope.effective_node_allowlist)
+    for pattern in patterns:
+        if pattern not in effective_patterns:
+            print(f'[warn] bad --scope-node regex: {pattern}')
+    profile_data['_scope'] = scope
     return profile_data
 
 
