@@ -11,6 +11,9 @@ roadmap-driven 0.x line where each minor version is a coherent feature set
   inactive, include-all behavior when no valid patterns are configured.
 - Pure snapshot narrowing derived from the scope's node allowlist, with
   referentially consistent topics and graph edges.
+- Serving-layer scope application across the REST API, WebSocket stream,
+  Markdown briefing, and web UI, with active scope metadata and repeatable
+  `--scope-node` agent overrides.
 
 ## [0.4.0] — show it — 2026-06-11
 

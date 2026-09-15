@@ -190,6 +190,10 @@ detection into one live view — and one Markdown briefing you can hand to an AI
   WebSocket stream, and web UI. Override the profile ad hoc with repeatable
   `--scope-node REGEX` options. If no usable pattern is configured, the scope
   is inactive and the complete graph remains visible.
+  ```bash
+  ros2 run ros_graph_debugger agent \
+    --scope-node '^/camera/.*' --scope-node '^/planner$'
+  ```
 - **Live tuning**: a Settings tab (and `POST /api/v1/config`) to adjust expected
   rates and thresholds at runtime — no restart, the issue engine picks it up.
 - **Terminal top view**: `rgd top` gives an SSH-friendly dashboard with
@@ -258,10 +262,6 @@ deliberately conservative:
 ```bash
 ros2 run ros_graph_debugger agent \
   --probe-regex '^/perception/.*' --max-probe-topics 20
-
-# narrow the served graph without editing a profile
-ros2 run ros_graph_debugger agent \
-  --scope-node '^/camera/.*' --scope-node '^/planner$'
 ```
 
 ## CLI

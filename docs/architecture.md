@@ -54,7 +54,7 @@ UI and to AI tools. Nothing in the target system is modified.
 | `config.py` | `ProbeConfig` / `Thresholds` (rclpy-free), pattern expectations, live apply |
 | `scope.py` | rclpy-free scoped-view configuration, node matching, and snapshot narrowing |
 | `profile.py` / `paths.py` | profile loading + asset discovery |
-| `server.py` | FastAPI REST/WS, Markdown, config, replay |
+| `server.py` | FastAPI REST/WS, Markdown, config, replay; applies the view scope at one shared snapshot-read boundary |
 | `markdown.py` | AI-friendly snapshot briefing |
 | `recording.py` / `report.py` | NDJSON capture + HTML/Markdown reports |
 | `diff.py` | regression diff between two recordings' reports (rate/callback/issue/health) |
@@ -77,7 +77,9 @@ therefore reconstructs the node set from `get_publishers_info_by_topic()` /
 3. Process poll (0.5 Hz) maps nodes→PIDs best-effort (honest confidence).
 4. Metrics+analyze (1 Hz): fold probe metrics in, snapshot TF/diagnostics, run
    `analyze()` → `store.set_issues()`.
-5. The web server streams `store.snapshot()` over the WebSocket.
+5. Collection and analysis retain the full graph. The server applies the view
+   scope at its single snapshot-read helper, shared by every snapshot-backed
+   REST endpoint and the WebSocket stream.
 
 See [api.md](api.md) for the HTTP surface and [performance_safety.md](performance_safety.md)
 for the probing policy.
