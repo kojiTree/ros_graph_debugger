@@ -13,9 +13,11 @@ import urllib.request
 
 import pytest
 import uvicorn
+from websockets.sync.client import connect
 
 from ros_graph_debugger.markdown import snapshot_to_markdown
 from ros_graph_debugger.model import Issue, NodeInfo, RuntimeGraphStore, TopicInfo
+from ros_graph_debugger.scope import ScopeConfig
 from ros_graph_debugger.server import create_app
 
 
@@ -72,6 +74,34 @@ def _get_json(url):
         return json.loads(r.read())
 
 
+@pytest.fixture(scope='module')
+def scoped_base_url():
+    app = create_app(
+        _store_with_unrelated(), web_dir='/nonexistent', stream_period=0.01,
+        profile_data={
+            'name': 'scoped',
+            'groups': {},
+            '_scope': ScopeConfig(node_allowlist=['^/bad[', '^/planner$']),
+        })
+    port = 38940
+    config = uvicorn.Config(app, host='127.0.0.1', port=port, log_level='error')
+    server = uvicorn.Server(config)
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    url = f'http://127.0.0.1:{port}'
+    for _ in range(50):
+        try:
+            urllib.request.urlopen(url + '/api/v1/health', timeout=1)
+            break
+        except Exception:
+            time.sleep(0.1)
+    else:
+        raise RuntimeError('server did not start')
+    yield url
+    server.should_exit = True
+    thread.join(timeout=5)
+
+
 def test_rest_endpoints(base_url):
     assert _get_json(base_url + '/api/v1/health')['status'] == 'ok'
     assert _get_json(base_url + '/api/v1/profile')['name'] == 'autoware'
@@ -84,6 +114,59 @@ def test_rest_endpoints(base_url):
 
     issues = _get_json(base_url + '/api/v1/issues')
     assert issues[0]['kind'] == 'bottleneck'
+
+
+def test_unconfigured_scope_preserves_existing_app_payloads(base_url):
+    profile = _get_json(base_url + '/api/v1/profile')
+    assert profile == {'name': 'autoware', 'groups': {}}
+    assert {n['id'] for n in _get_json(base_url + '/api/v1/nodes')} == {
+        '/detector', '/tracker'}
+
+    stream_url = base_url.replace('http://', 'ws://') + '/api/v1/stream'
+    with connect(stream_url, open_timeout=5) as websocket:
+        snapshot = json.loads(websocket.recv(timeout=5))
+    assert {node['id'] for node in snapshot['nodes']} == {
+        '/detector', '/tracker'}
+
+
+def test_scoped_app_uses_same_view_across_rest_and_markdown(scoped_base_url):
+    profile = _get_json(scoped_base_url + '/api/v1/profile')
+    assert profile['scope'] == {'node_allowlist': ['^/planner$']}
+
+    snapshot = _get_json(scoped_base_url + '/api/v1/snapshot')
+    graph = _get_json(scoped_base_url + '/api/v1/graph')
+    nodes = _get_json(scoped_base_url + '/api/v1/nodes')
+    topics = _get_json(scoped_base_url + '/api/v1/topics')
+    assert [node['id'] for node in snapshot['nodes']] == ['/planner']
+    assert graph['nodes'] == nodes == snapshot['nodes']
+    assert graph['topics'] == topics == snapshot['topics']
+    assert [topic['name'] for topic in topics] == ['/traj']
+    assert _get_json(scoped_base_url + '/api/v1/issues') == []
+    assert _get_json(scoped_base_url + '/api/v1/summary')['verdict'] == 'ok'
+
+    with urllib.request.urlopen(
+            scoped_base_url + '/api/v1/snapshot.md', timeout=5) as response:
+        markdown = response.read().decode()
+    assert '/traj' in markdown
+    assert '/objects' not in markdown
+
+
+def test_app_ignores_unexpected_private_scope_type():
+    app = create_app(
+        _store(), web_dir='/nonexistent',
+        profile_data={'name': 'recording', 'groups': {}, '_scope': {}})
+    profile_route = next(
+        route for route in app.routes if route.path == '/api/v1/profile')
+
+    assert profile_route.endpoint() == {'name': 'recording', 'groups': {}}
+
+
+def test_scoped_app_stream_uses_same_view(scoped_base_url):
+    stream_url = scoped_base_url.replace('http://', 'ws://') + '/api/v1/stream'
+    with connect(stream_url, open_timeout=5) as websocket:
+        snapshot = json.loads(websocket.recv(timeout=5))
+    assert [node['id'] for node in snapshot['nodes']] == ['/planner']
+    assert [topic['name'] for topic in snapshot['topics']] == ['/traj']
 
 
 def test_markdown_leads_with_health_verdict():

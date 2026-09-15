@@ -52,6 +52,7 @@ def test_scope_matches_fully_qualified_node_ids_and_skips_invalid_patterns():
     assert scope.matches_node('/planner')
     assert not scope.matches_node('/camera_driver')
     assert not scope.matches_node('/planner/helper')
+    assert scope.effective_node_allowlist == ['^/camera/.*', '^/planner$']
 
 
 def test_set_node_allowlist_rebuilds_compiled_patterns():
