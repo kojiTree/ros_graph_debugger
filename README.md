@@ -179,17 +179,21 @@ detection into one live view — and one Markdown briefing you can hand to an AI
   together (`detector [cb 210 ms ⟵ slowest cb] → /objects (4.1 Hz ⟵ slowest)`).
 - **Profiles**: `autoware`, `nav2`, `moveit` (grouping + expected rates, incl.
   regex patterns like `^/control/command/.*` that set a floor for a whole stage).
-  A custom profile can also declare node patterns for scoped-view consumers:
+  A profile can also declare node patterns for scoped-view consumers:
   ```yaml
   scope:
     node_allowlist:
-      - '^/example/.*'
-      - '^/standalone_node$'
+      - '^/camera$'
+      - '^/detector$'
+      - '^/tracker$'
   ```
   Patterns match fully-qualified node ids and narrow the existing REST API,
   WebSocket stream, and web UI. Override the profile ad hoc with repeatable
   `--scope-node REGEX` options. If no usable pattern is configured, the scope
   is inactive and the complete graph remains visible.
+  The bundled [`scope-example` profile](profiles/scope-example.yaml) uses this
+  configuration with the demo pipeline from the quick start above; run it with
+  `ros2 run ros_graph_debugger agent --profile scope-example`.
   ```bash
   ros2 run ros_graph_debugger agent \
     --scope-node '^/camera/.*' --scope-node '^/planner$'

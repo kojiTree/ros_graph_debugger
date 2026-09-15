@@ -7,13 +7,11 @@ roadmap-driven 0.x line where each minor version is a coherent feature set
 ## [Unreleased]
 
 ### Added
-- Profile `scope.node_allowlist` configuration with tolerant regex parsing and
-  inactive, include-all behavior when no valid patterns are configured.
-- Pure snapshot narrowing derived from the scope's node allowlist, with
-  referentially consistent topics and graph edges.
-- Serving-layer scope application across the REST API, WebSocket stream,
-  Markdown briefing, and web UI, with active scope metadata and repeatable
-  `--scope-node` agent overrides.
+- Configurable scoped graph views for v0.5.0: profile `scope.node_allowlist`
+  parsing, referentially consistent snapshot narrowing, and serving-layer
+  application across the REST API, WebSocket stream, Markdown briefing, and
+  web UI, with inactive include-all behavior, repeatable `--scope-node`
+  overrides, and a bundled `scope-example` profile.
 
 ## [0.4.0] — show it — 2026-06-11
 

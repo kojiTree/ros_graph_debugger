@@ -1,0 +1,8 @@
+name: scope-example
+description: Example node-scoped view of the bundled demo pipeline.
+
+scope:
+  node_allowlist:
+    - '^/camera$'
+    - '^/detector$'
+    - '^/tracker$'

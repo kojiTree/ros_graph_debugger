@@ -2,6 +2,7 @@
 
 import pytest
 
+from ros_graph_debugger.paths import find_profile
 from ros_graph_debugger.profile import load_profile
 from ros_graph_debugger.scope import ScopeConfig, filter_snapshot
 
@@ -21,6 +22,73 @@ def test_profile_parses_node_allowlist(tmp_path):
     assert isinstance(data['_scope'], ScopeConfig)
     assert data['_scope'].node_allowlist == ['^/camera/.*', '^/planner$']
     assert data['_scope'].active
+
+
+def test_bundled_scope_example_narrows_representative_snapshot():
+    path = find_profile('scope-example')
+    assert path, 'scope-example profile should be discoverable by name'
+    data, name = load_profile(path)
+    snapshot = {
+        'nodes': [
+            {'id': '/camera', 'publishers': ['/image'],
+             'subscribers': []},
+            {'id': '/detector', 'publishers': ['/objects'],
+             'subscribers': ['/image']},
+            {'id': '/tracker', 'publishers': ['/tracked'],
+             'subscribers': ['/objects']},
+            {'id': '/planner', 'publishers': ['/trajectory'],
+             'subscribers': ['/tracked']},
+            {'id': '/controller', 'publishers': [],
+             'subscribers': ['/trajectory']},
+        ],
+        'topics': [
+            {'name': '/image', 'publishers': ['/camera'],
+             'subscribers': ['/detector'],
+             'publisher_count': 1, 'subscriber_count': 1},
+            {'name': '/objects', 'publishers': ['/detector'],
+             'subscribers': ['/tracker'],
+             'publisher_count': 1, 'subscriber_count': 1},
+            {'name': '/tracked', 'publishers': ['/tracker'],
+             'subscribers': ['/planner'],
+             'publisher_count': 1, 'subscriber_count': 1},
+            {'name': '/trajectory', 'publishers': ['/planner'],
+             'subscribers': ['/controller'],
+             'publisher_count': 1, 'subscriber_count': 1},
+        ],
+        'edges': [
+            {'from_node': '/camera',
+             'to_node': '/detector', 'topic': '/image'},
+            {'from_node': '/detector',
+             'to_node': '/tracker', 'topic': '/objects'},
+            {'from_node': '/tracker',
+             'to_node': '/planner', 'topic': '/tracked'},
+            {'from_node': '/planner',
+             'to_node': '/controller', 'topic': '/trajectory'},
+        ],
+    }
+
+    narrowed = filter_snapshot(snapshot, data['_scope'])
+
+    assert name == 'scope-example'
+    assert [node['id'] for node in narrowed['nodes']] == [
+        '/camera', '/detector', '/tracker']
+    assert narrowed['topics'] == [
+        {'name': '/image', 'publishers': ['/camera'],
+         'subscribers': ['/detector'],
+         'publisher_count': 1, 'subscriber_count': 1},
+        {'name': '/objects', 'publishers': ['/detector'],
+         'subscribers': ['/tracker'],
+         'publisher_count': 1, 'subscriber_count': 1},
+        {'name': '/tracked', 'publishers': ['/tracker'],
+         'subscribers': [],
+         'publisher_count': 1, 'subscriber_count': 0},
+    ]
+    assert narrowed['edges'] == [
+        {'from_node': '/camera',
+         'to_node': '/detector', 'topic': '/image'},
+        {'from_node': '/detector',
+         'to_node': '/tracker', 'topic': '/objects'},
+    ]
 
 
 @pytest.mark.parametrize('contents', [
