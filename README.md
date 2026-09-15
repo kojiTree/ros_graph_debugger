@@ -186,10 +186,10 @@ detection into one live view — and one Markdown briefing you can hand to an AI
       - '^/example/.*'
       - '^/standalone_node$'
   ```
-  Patterns match fully-qualified node ids. This release parses and validates
-  the declaration; applying it to the graph view is a follow-up. If the section
-  is absent, empty, or contains no valid regex, the scope is inactive and its
-  matcher includes every node.
+  Patterns match fully-qualified node ids and narrow the existing REST API,
+  WebSocket stream, and web UI. Override the profile ad hoc with repeatable
+  `--scope-node REGEX` options. If no usable pattern is configured, the scope
+  is inactive and the complete graph remains visible.
 - **Live tuning**: a Settings tab (and `POST /api/v1/config`) to adjust expected
   rates and thresholds at runtime — no restart, the issue engine picks it up.
 - **Terminal top view**: `rgd top` gives an SSH-friendly dashboard with
@@ -258,6 +258,10 @@ deliberately conservative:
 ```bash
 ros2 run ros_graph_debugger agent \
   --probe-regex '^/perception/.*' --max-probe-topics 20
+
+# narrow the served graph without editing a profile
+ros2 run ros_graph_debugger agent \
+  --scope-node '^/camera/.*' --scope-node '^/planner$'
 ```
 
 ## CLI

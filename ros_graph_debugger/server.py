@@ -22,6 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from . import __version__
 from .markdown import snapshot_to_markdown
 from .model import RuntimeGraphStore
+from .scope import ScopeConfig, filter_snapshot
 
 
 def create_app(store, web_dir: str,
@@ -30,6 +31,12 @@ def create_app(store, web_dir: str,
                replay=None, replay_interval: float = 0.5,
                thresholds=None) -> FastAPI:
     app = FastAPI(title='ros_graph_debugger', version=__version__)
+
+    scope = (profile_data or {}).get('_scope', ScopeConfig())
+
+    def read_snapshot() -> dict:
+        """Read the store once and apply the configured serving view."""
+        return filter_snapshot(store.snapshot().to_dict(), scope)
 
     # A single background task advances the replay cursor, so playback speed is
     # independent of how many browser tabs are connected.
@@ -42,14 +49,18 @@ def create_app(store, web_dir: str,
                     replay.advance()
             app.state._replay_task = asyncio.create_task(_tick())
 
-    # Expose only the UI-relevant parts of the profile (groups), not the
-    # derived expectation maps used internally.
+    # Expose only the UI-relevant parts of the profile and serving scope, not
+    # the derived expectation maps used internally.
     profile_public = None
     if profile_data:
         profile_public = {
             'name': profile_data.get('name'),
             'groups': profile_data.get('groups', {}),
         }
+        if scope.active:
+            profile_public['scope'] = {
+                'node_allowlist': list(scope.node_allowlist),
+            }
 
     # ------------------------------------------------------------- REST API #
     @app.get('/api/v1/health')
@@ -81,51 +92,51 @@ def create_app(store, web_dir: str,
 
     @app.get('/api/v1/snapshot')
     def snapshot():
-        return JSONResponse(store.snapshot().to_dict())
+        return JSONResponse(read_snapshot())
 
     @app.get('/api/v1/snapshot.md', response_class=PlainTextResponse)
     def snapshot_md(focus: str | None = None):
-        return snapshot_to_markdown(store.snapshot(), focus=focus)
+        return snapshot_to_markdown(read_snapshot(), focus=focus)
 
     @app.get('/api/v1/graph')
     def graph():
-        s = store.snapshot().to_dict()
+        s = read_snapshot()
         return {'timestamp': s['timestamp'], 'profile': s['profile'],
                 'nodes': s['nodes'], 'topics': s['topics'], 'edges': s['edges']}
 
     @app.get('/api/v1/nodes')
     def nodes():
-        return store.snapshot().to_dict()['nodes']
+        return read_snapshot()['nodes']
 
     @app.get('/api/v1/topics')
     def topics():
-        return store.snapshot().to_dict()['topics']
+        return read_snapshot()['topics']
 
     @app.get('/api/v1/tf')
     def tf():
-        return store.snapshot().to_dict()['tf_edges']
+        return read_snapshot()['tf_edges']
 
     @app.get('/api/v1/diagnostics')
     def diagnostics():
-        return store.snapshot().to_dict()['diagnostics']
+        return read_snapshot()['diagnostics']
 
     @app.get('/api/v1/callbacks')
     def callbacks():
-        return store.snapshot().to_dict().get('callbacks', [])
+        return read_snapshot().get('callbacks', [])
 
     @app.get('/api/v1/issues')
     def issues():
-        return store.snapshot().to_dict()['issues']
+        return read_snapshot()['issues']
 
     @app.get('/api/v1/summary')
     def summary():
         from .health import summarize_health
-        return summarize_health(store.snapshot().to_dict())
+        return summarize_health(read_snapshot())
 
     @app.get('/api/v1/path')
     def path(target: str):
         from .pipeline import trace_pipeline_path
-        p = trace_pipeline_path(store.snapshot().to_dict(), target)
+        p = trace_pipeline_path(read_snapshot(), target)
         if p is None:
             return JSONResponse(
                 {'error': f'no connected path through {target!r}'},
@@ -160,7 +171,7 @@ def create_app(store, web_dir: str,
         await ws.accept()
         try:
             while True:
-                payload = json.dumps(store.snapshot().to_dict())
+                payload = json.dumps(read_snapshot())
                 await ws.send_text(payload)
                 await asyncio.sleep(stream_period)
         except WebSocketDisconnect:

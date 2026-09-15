@@ -21,6 +21,7 @@ from .model import RuntimeGraphStore
 from .paths import find_profile, find_web_dir
 from .profile import load_profile
 from .server import create_app
+from .scope import ScopeConfig
 
 
 def _parse_args(argv=None):
@@ -35,6 +36,10 @@ def _parse_args(argv=None):
                    help='disable all message-rate probing')
     p.add_argument('--probe-topic', action='append', default=[],
                    metavar='GLOB', help='probe only these topics (repeatable)')
+    p.add_argument('--scope-node', action='append', default=None,
+                   metavar='REGEX',
+                   help='show only matching node ids (repeatable; overrides '
+                        'profile scope)')
     p.add_argument('--probe-regex', default='',
                    help='probe topics matching this regex')
     p.add_argument('--probe-large-topics', action='store_true',
@@ -48,6 +53,15 @@ def _parse_args(argv=None):
                    help='NDJSON callback-duration trace (Tier C) to load as '
                         'callback stats; produce it from ros2_tracing')
     return p.parse_args(argv)
+
+
+def _apply_scope_override(profile_data, node_allowlist):
+    if node_allowlist is None:
+        return profile_data
+    if profile_data is None:
+        profile_data = {}
+    profile_data['_scope'] = ScopeConfig(node_allowlist=list(node_allowlist))
+    return profile_data
 
 
 def main(argv=None) -> None:
@@ -80,6 +94,8 @@ def main(argv=None) -> None:
                 callback_ms=profile_data.get('_callback_ms_patterns', []))
         else:
             print(f'[warn] profile not found: {args.profile}')
+
+    profile_data = _apply_scope_override(profile_data, args.scope_node)
 
     for item in args.expect:
         if '=' in item:
