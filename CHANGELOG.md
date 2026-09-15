@@ -9,6 +9,8 @@ roadmap-driven 0.x line where each minor version is a coherent feature set
 ### Added
 - Profile `scope.node_allowlist` configuration with tolerant regex parsing and
   inactive, include-all behavior when no valid patterns are configured.
+- Pure snapshot narrowing derived from the scope's node allowlist, with
+  referentially consistent topics and graph edges.
 
 ## [0.4.0] — show it — 2026-06-11
 

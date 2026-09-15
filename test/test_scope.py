@@ -3,7 +3,7 @@
 import pytest
 
 from ros_graph_debugger.profile import load_profile
-from ros_graph_debugger.scope import ScopeConfig
+from ros_graph_debugger.scope import ScopeConfig, filter_snapshot
 
 
 def test_profile_parses_node_allowlist(tmp_path):
@@ -61,3 +61,123 @@ def test_set_node_allowlist_rebuilds_compiled_patterns():
 
     assert not scope.matches_node('/before')
     assert scope.matches_node('/after')
+
+
+def _snapshot():
+    return {
+        'timestamp': 123.0,
+        'profile': 'test',
+        'nodes': [
+            {'id': '/camera', 'publishers': ['/image'], 'subscribers': []},
+            {'id': '/detector', 'publishers': ['/objects'],
+             'subscribers': ['/image']},
+            {'id': '/viewer', 'publishers': [], 'subscribers': ['/objects']},
+        ],
+        'topics': [
+            {'name': '/image', 'publishers': ['/camera'],
+             'subscribers': ['/detector'], 'publisher_count': 1,
+             'subscriber_count': 1,
+             'qos_endpoints': [{'node': '/camera'}, {'node': '/detector'}]},
+            {'name': '/objects', 'publishers': ['/detector'],
+             'subscribers': ['/viewer'], 'publisher_count': 1,
+             'subscriber_count': 1,
+             'qos_endpoints': [{'node': '/detector'}, {'node': '/viewer'}]},
+            {'name': '/unrelated', 'publishers': ['/viewer'],
+             'subscribers': [], 'publisher_count': 1,
+             'subscriber_count': 0},
+        ],
+        'edges': [
+            {'from_node': '/camera', 'to_node': '/detector',
+             'topic': '/image'},
+            {'from_node': '/detector', 'to_node': '/viewer',
+             'topic': '/objects'},
+        ],
+        'tf_edges': [{'parent': 'map', 'child': 'base_link'}],
+        'diagnostics': [{'name': 'camera temperature', 'level': 0}],
+        'callbacks': [
+            {'node': '/detector', 'callback': 'image', 'topic': '/image'},
+            {'node': '/detector', 'callback': 'timer', 'topic': ''},
+            {'node': '/viewer', 'callback': 'objects', 'topic': '/objects'},
+        ],
+        'issues': [
+            {'id': 'mixed', 'related_nodes': ['/detector', '/viewer'],
+             'related_topics': ['/objects', '/unrelated']},
+            {'id': 'viewer', 'related_nodes': ['/viewer'],
+             'related_topics': []},
+            {'id': 'tf', 'related_nodes': [], 'related_topics': [],
+             'related_frames': ['map']},
+        ],
+        'extension': {'preserved': True},
+    }
+
+
+def test_filter_snapshot_derives_topics_edges_and_related_categories():
+    snapshot = _snapshot()
+    original = _snapshot()
+    narrowed = filter_snapshot(
+        snapshot, ScopeConfig(node_allowlist=['^/(camera|detector)$']))
+
+    assert [node['id'] for node in narrowed['nodes']] == ['/camera', '/detector']
+    assert [topic['name'] for topic in narrowed['topics']] == ['/image', '/objects']
+    assert narrowed['edges'] == [{
+        'from_node': '/camera', 'to_node': '/detector', 'topic': '/image'}]
+    assert [callback['callback'] for callback in narrowed['callbacks']] == [
+        'image', 'timer']
+    assert [issue['id'] for issue in narrowed['issues']] == ['mixed', 'tf']
+    assert narrowed['issues'][0]['related_nodes'] == ['/detector']
+    assert narrowed['issues'][0]['related_topics'] == ['/objects']
+    assert narrowed['tf_edges'] == [{'parent': 'map', 'child': 'base_link'}]
+    assert narrowed['diagnostics'] == [
+        {'name': 'camera temperature', 'level': 0}]
+    assert narrowed['extension'] == {'preserved': True}
+    assert snapshot == original
+
+
+def test_filter_snapshot_has_no_dangling_references_and_consistent_counts():
+    narrowed = filter_snapshot(
+        _snapshot(), ScopeConfig(node_allowlist=['^/detector$']))
+
+    node_ids = {node['id'] for node in narrowed['nodes']}
+    topic_names = {topic['name'] for topic in narrowed['topics']}
+    assert topic_names == {'/image', '/objects'}
+    image = next(topic for topic in narrowed['topics']
+                 if topic['name'] == '/image')
+    assert image['publishers'] == []
+    assert image['publisher_count'] == 0
+    assert image['subscribers'] == ['/detector']
+    assert image['subscriber_count'] == 1
+    for topic in narrowed['topics']:
+        assert set(topic['publishers']) <= node_ids
+        assert set(topic['subscribers']) <= node_ids
+        assert topic['publisher_count'] == len(topic['publishers'])
+        assert topic['subscriber_count'] == len(topic['subscribers'])
+        assert {endpoint['node'] for endpoint in topic['qos_endpoints']} <= node_ids
+    for edge in narrowed['edges']:
+        assert {edge['from_node'], edge['to_node']} <= node_ids
+        assert edge['topic'] in topic_names
+    for node in narrowed['nodes']:
+        assert set(node['publishers']) <= topic_names
+        assert set(node['subscribers']) <= topic_names
+
+
+def test_filter_snapshot_does_not_treat_missing_node_ids_as_endpoints():
+    snapshot = _snapshot()
+    snapshot['nodes'].append({'publishers': [], 'subscribers': []})
+    snapshot['edges'].append({'topic': '/image'})
+
+    narrowed = filter_snapshot(
+        snapshot, ScopeConfig(node_allowlist=['.*']))
+
+    assert len(narrowed['nodes']) == 3
+    assert all(node.get('id') is not None for node in narrowed['nodes'])
+    assert all(edge.get('from_node') is not None
+               and edge.get('to_node') is not None
+               for edge in narrowed['edges'])
+
+
+def test_filter_snapshot_returns_snapshot_unchanged_when_scope_is_inactive():
+    snapshot = _snapshot()
+
+    narrowed = filter_snapshot(snapshot, ScopeConfig())
+
+    assert narrowed is snapshot
