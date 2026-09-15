@@ -52,6 +52,7 @@ UI and to AI tools. Nothing in the target system is modified.
 | `procmap.py` | node→process attribution with layered confidence (rclpy-free, unit-tested) |
 | `federation.py` | merge snapshots from several agents into one host-namespaced fleet view |
 | `config.py` | `ProbeConfig` / `Thresholds` (rclpy-free), pattern expectations, live apply |
+| `scope.py` | rclpy-free scoped-view configuration and node allowlist matching |
 | `profile.py` / `paths.py` | profile loading + asset discovery |
 | `server.py` | FastAPI REST/WS, Markdown, config, replay |
 | `markdown.py` | AI-friendly snapshot briefing |

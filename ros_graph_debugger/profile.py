@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import yaml
 
+from .scope import ScopeConfig
+
 
 def load_profile(path: str) -> tuple[dict, str]:
     with open(path, 'r') as f:
@@ -49,4 +51,11 @@ def load_profile(path: str) -> tuple[dict, str]:
     data['_min_rate_patterns'] = min_rate_patterns
     data['_max_age_patterns'] = max_age_patterns
     data['_callback_ms_patterns'] = callback_ms_patterns
+
+    scope_data = data.get('scope')
+    node_allowlist = scope_data.get('node_allowlist', []) \
+        if isinstance(scope_data, dict) else []
+    if not isinstance(node_allowlist, list):
+        node_allowlist = []
+    data['_scope'] = ScopeConfig(node_allowlist=node_allowlist)
     return data, name
