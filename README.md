@@ -177,22 +177,25 @@ detection into one live view — and one Markdown briefing you can hand to an AI
   `GET /api/v1/path`. Each hop also carries the consuming node's **callback
   p95**, so the path shows the rate bottleneck *and* the execution bottleneck
   together (`detector [cb 210 ms ⟵ slowest cb] → /objects (4.1 Hz ⟵ slowest)`).
-- **Profiles**: `autoware`, `nav2`, `moveit` (grouping + expected rates, incl.
-  regex patterns like `^/control/command/.*` that set a floor for a whole stage).
-  A custom profile can also declare node patterns for scoped-view consumers:
+- **Profiles**: ecosystem profiles `autoware`, `nav2`, `moveit` (grouping +
+  expected rates, incl. regex patterns like `^/control/command/.*` that set a
+  floor for a whole stage). A profile can also declare node patterns for
+  scoped-view consumers:
   ```yaml
   scope:
     node_allowlist:
       - '^/example/.*'
       - '^/standalone_node$'
   ```
-  The bundled [`scope-example` profile](profiles/scope-example.yaml) uses this
-  configuration; run it with
-  `ros2 run ros_graph_debugger agent --profile scope-example`.
   Patterns match fully-qualified node ids and narrow the existing REST API,
   WebSocket stream, and web UI. Override the profile ad hoc with repeatable
   `--scope-node REGEX` options. If no usable pattern is configured, the scope
   is inactive and the complete graph remains visible.
+  The bundled [`scope-example` profile](profiles/scope-example.yaml) uses this
+  configuration as a template; run it with
+  `ros2 run ros_graph_debugger agent --profile scope-example`. Its node names
+  are placeholders, so an empty graph is expected unless your running node ids
+  match them; replace the patterns with fully-qualified ids from your system.
   ```bash
   ros2 run ros_graph_debugger agent \
     --scope-node '^/camera/.*' --scope-node '^/planner$'

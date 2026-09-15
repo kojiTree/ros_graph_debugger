@@ -31,7 +31,8 @@ def _parse_args(argv=None):
     p.add_argument('--host', default='127.0.0.1')
     p.add_argument('--port', type=int, default=3939)
     p.add_argument('--profile', default=None,
-                   help='profile pack: autoware | nav2 | moveit | path to yaml')
+                   help='profile pack: autoware | nav2 | moveit | '
+                        'scope-example | path to yaml')
     p.add_argument('--no-probe', action='store_true',
                    help='disable all message-rate probing')
     p.add_argument('--probe-topic', action='append', default=[],
