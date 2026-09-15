@@ -30,23 +30,40 @@ def test_bundled_scope_example_narrows_representative_snapshot():
     data, name = load_profile(path)
     snapshot = {
         'nodes': [
-            {'id': '/example/camera', 'publishers': ['/image'],
+            {'id': '/camera', 'publishers': ['/image'],
              'subscribers': []},
-            {'id': '/standalone_node', 'publishers': [],
+            {'id': '/detector', 'publishers': ['/objects'],
              'subscribers': ['/image']},
-            {'id': '/monitor/logger', 'publishers': [],
-             'subscribers': ['/image']},
+            {'id': '/tracker', 'publishers': ['/tracked'],
+             'subscribers': ['/objects']},
+            {'id': '/planner', 'publishers': ['/trajectory'],
+             'subscribers': ['/tracked']},
+            {'id': '/controller', 'publishers': [],
+             'subscribers': ['/trajectory']},
         ],
         'topics': [
-            {'name': '/image', 'publishers': ['/example/camera'],
-             'subscribers': ['/standalone_node', '/monitor/logger'],
-             'publisher_count': 1, 'subscriber_count': 2},
+            {'name': '/image', 'publishers': ['/camera'],
+             'subscribers': ['/detector'],
+             'publisher_count': 1, 'subscriber_count': 1},
+            {'name': '/objects', 'publishers': ['/detector'],
+             'subscribers': ['/tracker'],
+             'publisher_count': 1, 'subscriber_count': 1},
+            {'name': '/tracked', 'publishers': ['/tracker'],
+             'subscribers': ['/planner'],
+             'publisher_count': 1, 'subscriber_count': 1},
+            {'name': '/trajectory', 'publishers': ['/planner'],
+             'subscribers': ['/controller'],
+             'publisher_count': 1, 'subscriber_count': 1},
         ],
         'edges': [
-            {'from_node': '/example/camera',
-             'to_node': '/standalone_node', 'topic': '/image'},
-            {'from_node': '/example/camera',
-             'to_node': '/monitor/logger', 'topic': '/image'},
+            {'from_node': '/camera',
+             'to_node': '/detector', 'topic': '/image'},
+            {'from_node': '/detector',
+             'to_node': '/tracker', 'topic': '/objects'},
+            {'from_node': '/tracker',
+             'to_node': '/planner', 'topic': '/tracked'},
+            {'from_node': '/planner',
+             'to_node': '/controller', 'topic': '/trajectory'},
         ],
     }
 
@@ -54,19 +71,24 @@ def test_bundled_scope_example_narrows_representative_snapshot():
 
     assert name == 'scope-example'
     assert [node['id'] for node in narrowed['nodes']] == [
-        '/example/camera', '/standalone_node']
-    assert narrowed['topics'] == [{
-        'name': '/image',
-        'publishers': ['/example/camera'],
-        'subscribers': ['/standalone_node'],
-        'publisher_count': 1,
-        'subscriber_count': 1,
-    }]
-    assert narrowed['edges'] == [{
-        'from_node': '/example/camera',
-        'to_node': '/standalone_node',
-        'topic': '/image',
-    }]
+        '/camera', '/detector', '/tracker']
+    assert narrowed['topics'] == [
+        {'name': '/image', 'publishers': ['/camera'],
+         'subscribers': ['/detector'],
+         'publisher_count': 1, 'subscriber_count': 1},
+        {'name': '/objects', 'publishers': ['/detector'],
+         'subscribers': ['/tracker'],
+         'publisher_count': 1, 'subscriber_count': 1},
+        {'name': '/tracked', 'publishers': ['/tracker'],
+         'subscribers': [],
+         'publisher_count': 1, 'subscriber_count': 0},
+    ]
+    assert narrowed['edges'] == [
+        {'from_node': '/camera',
+         'to_node': '/detector', 'topic': '/image'},
+        {'from_node': '/detector',
+         'to_node': '/tracker', 'topic': '/objects'},
+    ]
 
 
 @pytest.mark.parametrize('contents', [

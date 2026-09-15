@@ -1,7 +1,8 @@
 name: scope-example
-description: Example node-scoped graph view for a generic ROS system.
+description: Example node-scoped view of the bundled demo pipeline.
 
 scope:
   node_allowlist:
-    - '^/example/.*'
-    - '^/standalone_node$'
+    - '^/camera$'
+    - '^/detector$'
+    - '^/tracker$'
