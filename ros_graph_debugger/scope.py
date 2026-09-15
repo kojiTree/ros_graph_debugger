@@ -3,11 +3,13 @@
 This module deliberately has no ROS dependencies so profile loading and graph
 consumers can share it without importing :mod:`rclpy`.  Nodes are the sole
 allowlist: topics are derived from their retained publisher/subscriber
-endpoints, and graph edges must connect two retained nodes.  Callbacks and
-issues are filtered through their node/topic references.  TF edges and
-diagnostics stay global because their identifiers are frames and arbitrary
-status names rather than node ids, so applying node regexes to them would be
-misleading.
+endpoints, and graph edges must connect two retained nodes through a retained
+topic.  Callbacks and issues are filtered through their node/topic references.
+TF edges and diagnostics stay global because their identifiers are frames and
+arbitrary status names rather than node ids, so applying node regexes to them
+would be misleading.  Existing topic analysis fields (including ``status`` and
+``qos_status``) are preserved rather than recomputed: this pure view transform
+does not rerun analysis after narrowing endpoint counts.
 """
 
 from __future__ import annotations
@@ -73,8 +75,9 @@ def filter_snapshot(snapshot: dict, scope: ScopeConfig) -> dict:
         return snapshot
 
     node_ids = {
-        node.get('id') for node in snapshot.get('nodes', [])
-        if scope.matches_node(node.get('id', ''))
+        node_id for node in snapshot.get('nodes', [])
+        if (node_id := node.get('id')) is not None
+        and scope.matches_node(node_id)
     }
 
     topics = []

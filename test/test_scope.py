@@ -139,6 +139,13 @@ def test_filter_snapshot_has_no_dangling_references_and_consistent_counts():
 
     node_ids = {node['id'] for node in narrowed['nodes']}
     topic_names = {topic['name'] for topic in narrowed['topics']}
+    assert topic_names == {'/image', '/objects'}
+    image = next(topic for topic in narrowed['topics']
+                 if topic['name'] == '/image')
+    assert image['publishers'] == []
+    assert image['publisher_count'] == 0
+    assert image['subscribers'] == ['/detector']
+    assert image['subscriber_count'] == 1
     for topic in narrowed['topics']:
         assert set(topic['publishers']) <= node_ids
         assert set(topic['subscribers']) <= node_ids
@@ -151,6 +158,21 @@ def test_filter_snapshot_has_no_dangling_references_and_consistent_counts():
     for node in narrowed['nodes']:
         assert set(node['publishers']) <= topic_names
         assert set(node['subscribers']) <= topic_names
+
+
+def test_filter_snapshot_does_not_treat_missing_node_ids_as_endpoints():
+    snapshot = _snapshot()
+    snapshot['nodes'].append({'publishers': [], 'subscribers': []})
+    snapshot['edges'].append({'topic': '/image'})
+
+    narrowed = filter_snapshot(
+        snapshot, ScopeConfig(node_allowlist=['.*']))
+
+    assert len(narrowed['nodes']) == 3
+    assert all(node.get('id') is not None for node in narrowed['nodes'])
+    assert all(edge.get('from_node') is not None
+               and edge.get('to_node') is not None
+               for edge in narrowed['edges'])
 
 
 def test_filter_snapshot_returns_snapshot_unchanged_when_scope_is_inactive():
